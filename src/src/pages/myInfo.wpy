@@ -18,7 +18,6 @@
   import wepy from 'wepy'
   import MyTabbar from '../components/mytabbar'
   import MyNavBar from '../components/mynavbar'
-  import userInfo from '../data/userInfo'
 
   export default class MyInfo extends wepy.page {
     components = {
@@ -27,7 +26,8 @@
     }
     data = {
       userinfo: {},
-      islogin: false
+      islogin: false,
+      test: ''
     }
     methods = {
       tap() {
@@ -47,11 +47,9 @@
     }
     onShow() {
       this.$broadcast('changeActive', "2");
+      var that = this;
       this.userinfo = this.$parent.globalData.userInfo;
-      console.log(this.userinfo);
-      // console.log(userInfo)
       this.islogin = this.$parent.globalData.loginData.state;
-      console.log("islogin: " + this.islogin)
       this.$apply()
     }
   }  

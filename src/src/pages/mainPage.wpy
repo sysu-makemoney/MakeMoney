@@ -6,21 +6,11 @@
     <van-search
       class="search"
       value=""
-      placeholder="搜索任务，用户等"
+      placeholder="根据标题，详情，发布者等搜索任务"
       shape="round"
       disabled
       @tap="beginsearch"
     >
-<!--       <view slot="label" style="width: 70px;" @tap="selectLoc">
-        <van-row>
-          <van-col span="6">
-            <van-icon name="location-o" size="15px"></van-icon>
-          </van-col>
-          <text style="font-size: small;">{{location.city}}</text>
-        </van-row>
-        
-        
-      </view> -->
     </van-search>
     <!-- 页面主体 -->
     <view class="mainBody">
@@ -51,13 +41,13 @@
           </view>
           <view
             id="inner-wrap"
-            style="width: 100%;"
+            style="width: 100%; height: 100%"
             bindtouchstart="touch_start"
             bindtouchend="touch_end"
             bindtouchmove="touch_move"
             wx:else
             >
-            <view hidden="{{hideDragUp}}" style="width: 100%; height: {{dragUpHeight}}px; background-color: #87CEFA; display: flex; justify-content: center; align-items: center">
+            <view hidden="{{hideDragUp}}" style="width: 100%; height: {{dragUpHeight}}px; display: flex; justify-content: center; align-items: center">
               <text style="font-size: 13px;">松开即可刷新</text>
             </view>
             <tasklist :tasks.sync="tasks"></tasklist>
@@ -74,33 +64,24 @@
       <mytabbar></mytabbar>
     </view>
   </view>
-<!--   <van-popup
-    show="{{showCitySelector}}"
-    position="bottom"
-  >
-    <van-area
-      area-list="{{areaList}}"
-      @confirm="locConfirm"
-      @cancel="locCancel"
-    ></van-area>
-  </van-popup> -->
+  <van-toast id="van-toast"></van-toast>
+  <van-dialog id="van-dialog"></van-dialog>
 </template>
 
 <script>
   import wepy from 'wepy'
   import TaskList from '../components/tasklist'
   import MyTabbar from '../components/mytabbar'
-  // import AreaList from '../utility/area'
-  import TasksData from '../data/TempTaskData'
   import MyNavBar from '../components/mynavbar'
   import MyMainPageTitle from '../components/myMainPageTitle'
   import MyMainPageCategoryBtn from '../components/myMainPageCategoryBtn'
   import Toast from '../components/van/toast/toast'
+  import Dialog from '../components/van/dialog/dialog'
+  import JsonToObject from '../data/JsonToObject'
 
   export default class MainPage extends wepy.page {
     config = {
-      // "backgroundColor":"#fff",
-      // "backgroundTextStyle":"dark",
+
     }
     components = {
       tasklist: TaskList,
@@ -129,6 +110,7 @@
       dragUpHeight: 0,
       init: true,
       nomore: true,
+      nodata: false,
       start_scroll_time: null,
       end_scroll_time: null,
 
@@ -146,20 +128,6 @@
 
     }
     methods = {
-      // 选择地址
-      // selectLoc() {
-      //   this.showCitySelector = true;
-      // },
-      // locConfirm(e) {
-      //   var value = e.detail.values;
-      //   this.location.province = value[0].name;
-      //   this.location.city = value[1].name;
-      //   this.location.county = value[2].name;
-      //   this.showCitySelector = false;
-      // },
-      // locCancel() {
-      //   this.showCitySelector = false;
-      // },
       // 任务数据相关
       getNewData() {
         /* 
@@ -179,7 +147,8 @@
               'content-type': 'application/json'
             },
             data: {
-              batch_size: this.dataIndex + this.batch_size
+              batch_size: this.dataIndex + this.batch_size,
+              type: 'hot'
             },
             success: (res) => {
               console.log(res.data); 
@@ -194,6 +163,16 @@
               for (; this.dataIndex < res.data.task_number; this.dataIndex++) {
                 this.tasks.push(res.data.task_info[this.dataIndex])
                 this.tasks[this.dataIndex].itemid = "task_item_id" + this.dataIndex
+
+                //添加第一张图片
+                this.tasks[this.dataIndex].images = JsonToObject.JsonToUrl(this.tasks[this.dataIndex].images, this.$parent.globalData.ip);
+                if (this.tasks[this.dataIndex].images.length == 0) {
+                  this.tasks[this.dataIndex].images = this.$parent.globalData.ip + 'task/makemoney.jpeg';
+                }
+                else {
+                  this.tasks[this.dataIndex].images = this.tasks[this.dataIndex].images[0];
+                }
+                //.............
               }
               _this.loadingOpacity = 0
               _this.$apply()
@@ -201,14 +180,11 @@
                 _this.inner_height = rect.height;
               }).exec()
               console.log(this.dataIndex)
-              // 为了展示
-              // setTimeout((t) => {
-                
-              // }, 3000)
             },
             fail: (res) => {
               console.log(res)
-              this.nomore = true
+              this.nomore = false
+              this.dragUpHeight = 0
             },
             complete: (res) => {
               console.log('complete')
@@ -255,7 +231,7 @@
         }
       },
       touch_move(e) {
-        this.dragUpHeight = 0.8*(e.touches[0].clientY - this.touch_down)
+        this.dragUpHeight = 1.0*(e.touches[0].clientY - this.touch_down)
       },
       beginsearch() {
         wepy.navigateTo({
@@ -271,6 +247,7 @@
       this.batch_size = 10
       this.dataIndex = 0
       this.nomore = false
+      this.init = true
       this.tasks = []
       wx.request({
         url: this.$parent.globalData.ip + 'recommend',
@@ -279,7 +256,8 @@
           'content-type': 'application/json'
         },
         data: {
-          batch_size: this.dataIndex + this.batch_size
+          batch_size: this.dataIndex + this.batch_size,
+          type: 'new'
         },
         success: (res) => {
           console.log(res.data);
@@ -294,23 +272,47 @@
             else {
               this.nomore = false
             }
+            if (res.data.task_number == 0) {
+              this.dragUpHeight = 0
+              this.nomore = true
+            }
             for (; this.dataIndex < res.data.task_number; this.dataIndex++) {
               this.tasks.push(res.data.task_info[this.dataIndex])
+              //添加第一张图片
+              this.tasks[this.dataIndex].images = JsonToObject.JsonToUrl(this.tasks[this.dataIndex].images, this.$parent.globalData.ip);
+              if (this.tasks[this.dataIndex].images.length == 0) {
+                this.tasks[this.dataIndex].images = this.$parent.globalData.ip + 'task/makemoney.jpeg';
+              }
+              else {
+                this.tasks[this.dataIndex].images = this.tasks[this.dataIndex].images[0];
+              }
+              //.............
               this.tasks[this.dataIndex].itemid = "task_item_id" + this.dataIndex
             }
             _this.$apply()
-            wx.createSelectorQuery().select('#scroll-wrap').boundingClientRect((rect) => {
-              _this.height = rect.height;
-            }).exec()
-            wx.createSelectorQuery().select('#inner-wrap').boundingClientRect((rect) => {
-              _this.inner_height = rect.height;
-            }).exec()
+            if (!this.nodata) {
+              wx.createSelectorQuery().select('#scroll-wrap').boundingClientRect((rect) => {
+                _this.height = rect.height;
+              }).exec()
+              wx.createSelectorQuery().select('#inner-wrap').boundingClientRect((rect) => {
+                _this.inner_height = rect.height;
+              }).exec()
+            }
             console.log(this.dataIndex)
-          }, 1000)
+            clearTimeout(this.$parent.globalData.refreshtimer)
+          }, 500)
         },
         fail: (res) => {
           console.log(res)
-          this.nomore = true
+          this.dragUpHeight = 0
+          this.nomore = false
+          Dialog.alert({
+            message: '加载失败，请重新加载'
+          }).then((res) => {
+            this.$parent.globalData.refreshtimer = setTimeout((res) => {
+              this.refresh()
+            }, 3000)
+          })
         },
         complete: (res) => {
           console.log('complete')
@@ -321,6 +323,7 @@
       this.refresh()
     }
     onShow() {
+      // this.refresh()
       this.$broadcast('changeActive', "0");
     }
   }
@@ -369,6 +372,6 @@
     color: transparent;
   }
   .tasklist-view {
-    height: 87%;
+    height: 90%;
   }
 </style>

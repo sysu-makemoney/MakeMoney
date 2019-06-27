@@ -102,7 +102,7 @@ class Task(db.Model):
 		if 'paid_number' not in kwargs:
 			kwargs['paid_number'] = self.__table__.c.paid_number.default.arg
 		self.template = Template()
-		self.images = []
+		self.hot = 0
 		super(Task, self).__init__(**kwargs)
 	#任务id
 	id = db.Column(db.Integer, primary_key=True)
@@ -129,6 +129,8 @@ class Task(db.Model):
 	extra_content = db.Column(db.Text)
 	#任务状态，整数
 	state = db.Column(db.Integer)
+	#任务热度
+	hot = db.Column(db.Integer)
 
 	#任务发起者
 	sponsor_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -143,7 +145,7 @@ class Task(db.Model):
 	template = db.relationship('Template', backref=db.backref('task', lazy=False, uselist=False))
 
 	#图片
-	images = db.Column(db.PickleType)
+	images = db.Column(db.String(1000))
 
 	def __repr__(self):
 		return '<Task {} {} sponsor:{}>'.format(self.id, self.title, self.sponsor_id)
@@ -171,5 +173,4 @@ class Session(db.Model):
 #login的配置，使login生效
 @login.user_loader
 def load_user(id):
-	print('jasdkjfak')
 	return User.query.get(int(id))

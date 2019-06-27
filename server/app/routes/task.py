@@ -1,5 +1,5 @@
 # -- coding:UTF-8 --
-from flask import render_template, redirect, url_for, request, json, send_from_directory
+from flask import render_template, redirect, url_for, request, json, send_from_directory, Response
 from flask_login import current_user,login_user,logout_user
 from app import app,db
 from app.models import Template,Answer, Session
@@ -8,7 +8,6 @@ from app.utils.trans import UserToJson, TaskToJson
 from datetime import datetime, timedelta
 import os
 import uuid
-import cv2
 
 json_true = json.dumps('succeed')
 json_false = json.dumps('failed')
@@ -231,28 +230,59 @@ def task_cancel():
 @app.route('/task/postImage', methods=['POST'])
 def postImage():
     if request.method == 'POST':
-        json_data = json.loads(request.data)
-        if 'task_id' in json_data:
-            #查找任务
-            task = Task.query.filter_by(id=json_data['task_id']).first()
-            if task==None:
-                return json.dumps({'errmsg': '任务id错误，无该任务'})
-            filename = str(uuid.uuid1()) + ".jpg"
-            task.images.append(filename)
-            
-            #取出数据
-            f = request.files['image']
-            user_input = request.form.get("task_id")
-            #获得参数path和name
-            path = os.path.join(app.config['TASK_FOLDER'])
-            #存入服务器
-            if os.path.exists(path)==False:
-                os.makedirs(path)
-            f.save(path + filename)
-            #返回
-            return send_from_directory(app.config['TASK_FOLDER'], filename)
-        return json.dumps({'errmsg': '没有传递task_id'})
+        #取出数据
+        f = request.files['image']
+        task_id = request.form.get("task_id")
+        #查找任务
+        task = Task.query.filter_by(id=task_id).first()
+        if task==None:
+            return json.dumps({'errmsg': '任务id错误，无该任务'})
+        filename = str(uuid.uuid1()) + ".jpg"
+        
+        #将图片加入到images数据流中
+        print(task.images)
+        if task.images == None:
+            data = {}
+            data['0'] = filename
+            print(data)
+            task.images = json.dumps(data)
+        else:
+            data = json.loads(task.images)
+            data[str(len(data))] = filename
+            print(data)
+            task.images = json.dumps(data)
+
+        print(111)
+        print(task.images)
+        #获得参数path和name
+        path = os.path.join(app.config['TASK_FOLDER'])
+        #存入服务器
+        if os.path.exists(path)==False:
+            os.makedirs(path)
+        f.save(path + filename)
+        
+        db.session.commit()
+        print(task.images)
+        #返回
+        return json.dumps(filename)
     return json.dumps({'errmsg': '没有使用POST请求'})
+
+
+'''返回图片
+接受image的图片的整个名称（包括.jpg或者.jpeg）
+如果图片存在则返回图片，不存在则返回默认的makemoney图片
+'''
+@app.route("/task/<imagename>")
+def taskImg(imagename):
+    # imagename = 'Img/{}.jpeg'.format(imageid)
+    imagename = os.path.join(app.config['TASK_FOLDER'],imagename)
+    if not os.path.exists(imagename):
+        imagename = os.path.join(app.config['TASK_FOLDER'], 'makemoney.jpeg')
+    with open(imagename, 'rb') as f:
+        contents = f.read()
+        resp = Response(contents, mimetype="image/jpeg")
+        return resp
+    return render_template('index.html', title='Home')
 
 
 '''任务完成

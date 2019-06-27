@@ -1,2 +1,0 @@
-# Documents for our project
-
